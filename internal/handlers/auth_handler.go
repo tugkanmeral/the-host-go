@@ -1,20 +1,22 @@
 package handlers
 
 import (
-	"context"
-	"fmt"
-	"time"
+	"errors"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/tugkanmeral/the-host-go/internal/auth"
-	"github.com/tugkanmeral/the-host-go/internal/database"
 	model "github.com/tugkanmeral/the-host-go/internal/models/api"
-	"github.com/tugkanmeral/the-host-go/internal/models/entity"
-	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
+	"github.com/tugkanmeral/the-host-go/internal/service"
 )
 
-func Login(c *fiber.Ctx) error {
+type AuthHandler struct {
+	auth *service.AuthService
+}
+
+func NewAuthHandler(auth *service.AuthService) *AuthHandler {
+	return &AuthHandler{auth: auth}
+}
+
+func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req model.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(model.ErrorResponse{
@@ -28,36 +30,22 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	db := database.GetDB()
-	var user entity.User
-
-	err := db.Collection("Users").FindOne(ctx, bson.M{"username": req.Username}).Decode(&user)
+	token, err := h.auth.Login(c.UserContext(), req.Username, req.Password)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		switch {
+		case errors.Is(err, service.ErrInvalidCredentials):
 			return c.Status(fiber.StatusUnauthorized).JSON(model.ErrorResponse{
 				Message: "Kullanıcı adı veya şifre hatalı",
 			})
+		case errors.Is(err, service.ErrTokenGeneration):
+			return c.Status(fiber.StatusInternalServerError).JSON(model.ErrorResponse{
+				Message: "Token oluşturulurken bir hata oluştu",
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(model.ErrorResponse{
+				Message: "Kullanıcı aranırken bir hata oluştu",
+			})
 		}
-
-		return c.Status(fiber.StatusInternalServerError).JSON(model.ErrorResponse{
-			Message: "Kullanıcı aranırken bir hata oluştu",
-		})
-	}
-
-	if !auth.CheckPassword(user.Password, req.Password) {
-		return c.Status(fiber.StatusUnauthorized).JSON(model.ErrorResponse{
-			Message: "Kullanıcı adı veya şifre hatalı",
-		})
-	}
-
-	token, err := auth.GenerateToken(user.ID.Hex(), user.Username)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(model.ErrorResponse{
-			Message: "Token oluşturulurken bir hata oluştu",
-		})
 	}
 
 	return c.JSON(model.LoginResponse{
@@ -65,7 +53,7 @@ func Login(c *fiber.Ctx) error {
 	})
 }
 
-func Register(c *fiber.Ctx) error {
+func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req model.RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(model.ErrorResponse{
@@ -79,30 +67,22 @@ func Register(c *fiber.Ctx) error {
 		})
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	db := database.GetDB()
-	var existingUser entity.User
-	err := db.Collection(database.UserCollectionName).FindOne(ctx, bson.M{"username": req.Username}).Decode(&existingUser)
-
-	if existingUser.ID != bson.NilObjectID {
-		return c.Status(fiber.StatusBadRequest).JSON(model.ErrorResponse{
-			Message: "Username conflict",
-		})
-	}
-
-	hashedPass, _ := auth.HashPassword(req.Password)
-	var newUser entity.User
-	newUser.Username = req.Username
-	newUser.Password = hashedPass
-
-	_, err = db.Collection(database.UserCollectionName).InsertOne(ctx, newUser)
+	err := h.auth.Register(c.UserContext(), req.Username, req.Password)
 	if err != nil {
-		fmt.Println("Failed to insert user:", err.Error())
-		return c.Status(fiber.StatusBadRequest).JSON(model.ErrorResponse{
-			Message: "User cannot be registered!",
-		})
+		switch {
+		case errors.Is(err, service.ErrUsernameTaken):
+			return c.Status(fiber.StatusBadRequest).JSON(model.ErrorResponse{
+				Message: "Username conflict",
+			})
+		case errors.Is(err, service.ErrRegisterFailed):
+			return c.Status(fiber.StatusBadRequest).JSON(model.ErrorResponse{
+				Message: "User cannot be registered!",
+			})
+		default:
+			return c.Status(fiber.StatusInternalServerError).JSON(model.ErrorResponse{
+				Message: "User cannot be registered!",
+			})
+		}
 	}
 
 	return nil

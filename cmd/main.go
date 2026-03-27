@@ -7,6 +7,7 @@ import (
 	"github.com/tugkanmeral/the-host-go/internal/config"
 	"github.com/tugkanmeral/the-host-go/internal/database"
 	"github.com/tugkanmeral/the-host-go/internal/handlers"
+	"github.com/tugkanmeral/the-host-go/internal/service"
 )
 
 func main() {
@@ -21,23 +22,29 @@ func main() {
 		}
 	}()
 
-	setupRoutes()
+	db := database.GetDB()
+	authSvc := service.NewAuthService(db)
+	noteSvc := service.NewNoteService(db)
+	authHandler := handlers.NewAuthHandler(authSvc)
+	noteHandler := handlers.NewNoteHandler(noteSvc)
+
+	setupRoutes(authHandler, noteHandler)
 }
 
-func setupRoutes() {
+func setupRoutes(authHandler *handlers.AuthHandler, noteHandler *handlers.NoteHandler) {
 	app := fiber.New()
 
 	// Auth
 	auth := app.Group("api/auth")
-	auth.Post("/login", handlers.Login)
-	auth.Post("/register", handlers.Register)
+	auth.Post("/login", authHandler.Login)
+	auth.Post("/register", authHandler.Register)
 
 	// Note
 	note := app.Group("/api/note")
-	note.Post("/", handlers.Add)
-	note.Get("/", handlers.GetList)
-	note.Get("/:id", handlers.Get)
-	note.Put("/:id", handlers.Update)
+	note.Post("/", noteHandler.Add)
+	note.Get("/", noteHandler.GetList)
+	note.Get("/:id", noteHandler.Get)
+	note.Put("/:id", noteHandler.Update)
 
 	log.Fatal(app.Listen(":8000"))
 }
