@@ -28,23 +28,25 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authSvc)
 	noteHandler := handlers.NewNoteHandler(noteSvc)
 
-	setupRoutes(authHandler, noteHandler)
-}
+	addr := cfg.Port
+	if addr == "" {
+		addr = ":8000"
+	} else if addr[0] != ':' {
+		addr = ":" + addr
+	}
 
-func setupRoutes(authHandler *handlers.AuthHandler, noteHandler *handlers.NoteHandler) {
 	app := fiber.New()
 
-	// Auth
-	auth := app.Group("api/auth")
+	auth := app.Group("/api/auth")
 	auth.Post("/login", authHandler.Login)
 	auth.Post("/register", authHandler.Register)
 
-	// Note
 	note := app.Group("/api/note")
 	note.Post("/", noteHandler.Add)
 	note.Get("/", noteHandler.GetList)
 	note.Get("/:id", noteHandler.Get)
 	note.Put("/:id", noteHandler.Update)
+	note.Delete("/:id", noteHandler.Delete)
 
-	log.Fatal(app.Listen(":8000"))
+	log.Fatal(app.Listen(addr))
 }

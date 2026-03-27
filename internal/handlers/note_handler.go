@@ -68,8 +68,8 @@ func (h *NoteHandler) GetList(c *fiber.Ctx) error {
 		})
 	}
 
-	skipStr := c.Params("skip", "0")
-	takeStr := c.Params("take", "10")
+	skipStr := c.Query("skip", "0")
+	takeStr := c.Query("take", "10")
 
 	skip, err := strconv.ParseInt(skipStr, 10, 64)
 	if err != nil {
