@@ -1,0 +1,52 @@
+# Environment variables
+config/environments/.env.development
+config/environments/.env.production
+config/environments/.env.staging
+.env
+.env.local
+.env.*.local
+
+# Go
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+*.prof
+
+# Go build cache
+.cache/
+.go-cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+*.sublime-workspace
+
+# Binaries
+/the-host-go
+/cmd/main
+
+# Logs
+*.log
+
+# Dependencies
+vendor/
+go.sum
+
+# Testing
+.testcache/
+
+# OS specific
+Thumbs.db
+.env.test
+
