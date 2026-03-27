@@ -1,68 +1,62 @@
-# The Host Go - Fiber Web API
+# The Host Go
 
-Go Web API project with Fiber, MongoDB, JWT authentication, and multiple environments.
+Go project with a **Fiber HTTP API** and a **terminal (TUI) CLI** that share the same MongoDB layer and **`internal/service`** business logic (auth, notes, and extensions).
 
-## Project Structure
+## Project structure
 
 ```
 the-host-go/
-├── cmd/                          # Application entry point
-│   └── main.go                   # Server startup
+├── cmd/
+│   ├── api/                      # HTTP API entry point (Fiber)
+│   │   └── main.go
+│   └── cli/                      # Interactive CLI entry point (Bubble Tea)
+│       └── main.go
 │
-├── internal/                     # Application logic (not importable by external packages)
-│   ├── handlers/                 # HTTP request handlers
-│   ├── models/                   # Data models (structs)
-│   ├── database/                 # MongoDB connection and repository
-│   ├── middleware/               # Middleware functions
-│   ├── auth/                     # JWT and authentication
-│   ├── config/                   # Configuration management
-│   └── utils/                    # Helper functions
+├── internal/
+│   ├── cli/                      # TUI screens, session, app loop
+│   ├── handlers/                 # HTTP handlers
+│   ├── service/                  # Business logic (Auth, Note, …)
+│   ├── models/                   # Entity + API DTOs
+│   ├── database/                 # MongoDB connection & access
+│   ├── middleware/               # HTTP middleware (e.g. JWT)
+│   ├── auth/                     # JWT helpers, password hashing
+│   └── config/                   # Configuration loading
 │
 └── config/
     └── environments/             # .env files (.development, .staging, .production)
 ```
 
-## Folder Reference
+## Folder reference
 
 | Folder | Purpose |
 |--------|---------|
-| `cmd` | Where the app starts. Server bootstrap and route registration. |
-| `handlers` | Functions that implement API endpoints. |
-| `models` | Data structures for the database and API. |
-| `database` | MongoDB connection, collections, and queries. |
-| `middleware` | Cross-cutting concerns such as JWT, logging, and CORS. |
-| `auth` | JWT issuance, validation, and password handling. |
-| `config` | Load configuration values. |
-| `utils` | Reusable helper functions. |
-| `environments` | `.env` files for different environments. |
+| `cmd/api` | Starts the Fiber server; registers `/api/auth` and `/api/note` routes. |
+| `cmd/cli` | Connects to MongoDB, loads config, runs the `internal/cli` TUI. |
+| `internal/cli` | Terminal UI (session, screens). |
+| `internal/handlers` | REST endpoint implementations. |
+| `internal/service` | Shared domain logic for API and CLI. |
+| `internal/models` | Database entities and API models. |
+| `internal/database` | MongoDB connection and data access. |
+| `internal/middleware` | Cross-cutting HTTP concerns (JWT, CORS, …). |
+| `internal/auth` | JWT issuance/validation, password helpers. |
+| `internal/config` | Environment / `.env` loading. |
+| `config/environments` | Per-environment `.env` files. |
 
 ## Setup
 
-### 1. Initialize the Go module
+### 1. Clone and dependencies
+
+Module: `github.com/tugkanmeral/the-host-go`
+
 ```bash
-go mod init github.com/yourusername/the-host-go
+git clone <repository-url> the-host-go
+cd the-host-go
+go mod download
 ```
 
-### 2. Install dependencies
-```bash
-# Fiber Framework
-go get github.com/gofiber/fiber/v2
+### 2. Environment file
 
-# MongoDB Driver
-go get go.mongodb.org/mongo-driver
-
-# JWT
-go get github.com/golang-jwt/jwt/v5
-
-# Password hashing
-go get golang.org/x/crypto
-
-# Environment variables
-go get github.com/joho/godotenv
-```
-
-### 3. Create the environment file
-Create `config/environments/.env.development` and fill in the values:
+Create `config/environments/.env.development` and set values:
 
 ```bash
 PORT=8000
@@ -73,83 +67,96 @@ JWT_EXPIRATION=3600
 APP_ENV=development
 ```
 
-### 4. Start MongoDB
+### 3. MongoDB
+
 ```bash
-# With Docker
 docker run -d -p 27017:27017 --name mongodb mongo:latest
-
-# Or start a locally installed MongoDB instance
 ```
 
-### 5. Run the application
+### 4. Run
+
+**HTTP API** (listen address comes from config; default example `:8000`):
+
 ```bash
-go run ./cmd/main.go
+go run ./cmd/api
 ```
 
-## Development Flow
+**CLI** (same `.env` and MongoDB as the API):
 
-1. **Define a model** (`internal/models/`) — create the data structure
-2. **Database repository** (`internal/database/`) — implement CRUD
-3. **Write a handler** (`internal/handlers/`) — endpoint logic
-4. **Add middleware** (`internal/middleware/`) — wire middleware as needed
-5. **Register routes** (`cmd/main.go`) — connect handlers to routes
-6. **Test** — exercise your API
+```bash
+go run ./cmd/cli
+```
 
-## Example: user creation flow
+## Development flow
 
-1. Add the `User` struct in `internal/models/user.go`
-2. Implement `CreateUser` in `internal/database/user_repo.go`
-3. Add `CreateUserHandler` in `internal/handlers/user_handler.go`
-4. Enforce JWT in `internal/middleware/auth_middleware.go` where required
-5. Register `POST /users` in `cmd/main.go`
+1. **Model** (`internal/models/`) — data structures
+2. **Database** (`internal/database/`) — CRUD / queries
+3. **Service** (`internal/service/`) — shared logic for API and CLI
+4. **Handlers** (`internal/handlers/`) — HTTP endpoints
+5. **CLI** (`internal/cli/`) — terminal flows and screens
+6. **Routes** — Fiber groups in `cmd/api/main.go`
+7. **Verify** — via API client or the CLI
+
+## API overview
+
+Route groups (summary):
+
+- `POST /api/auth/register`, `POST /api/auth/login`
+- `POST /api/note/`, `GET /api/note/`, `GET /api/note/:id`, `PUT /api/note/:id`, `DELETE /api/note/:id`
 
 ## API response format
-
-All responses follow a standard shape:
 
 ```json
 {
     "success": true,
     "message": "Operation successful",
-    "data": { ... }
+    "data": { }
 }
 ```
 
 ## Environment management
 
 ### Development
+
 ```bash
 source config/environments/.env.development
-go run ./cmd/main.go
+go run ./cmd/api
+# or
+go run ./cmd/cli
 ```
 
-### Production
+### Production (API)
+
 ```bash
 source config/environments/.env.production
-go build -o app ./cmd/main.go
-./app
+go build -o the-host-api ./cmd/api
+./the-host-api
+```
+
+### Production (CLI)
+
+```bash
+go build -o the-host-cli ./cmd/cli
+./the-host-cli
 ```
 
 ## Important notes
 
-- Keep secrets in `.env` files
-- Add `.env` files to `.gitignore`
-- Use a MongoDB connection pool
-- Keep JWT expiration reasonably short
-- Hash passwords with bcrypt
-- Handle errors consistently
-- Add logging (request details as appropriate)
+- Keep secrets in `.env` files only; do not commit them.
+- Ensure `.env` files are listed in `.gitignore`.
+- Use a MongoDB connection pool in production workloads.
+- Keep JWT expiration reasonable; hash passwords with bcrypt.
+- Handle errors consistently and add logging where it helps operations.
 
 ## Libraries
 
-- **Fiber** — Web framework
-- **MongoDB Driver** — Database
-- **JWT** — Authentication
-- **bcrypt** — Password hashing
-- **godotenv** — Environment variables
+- **Fiber** — HTTP framework
+- **MongoDB Driver v2** — database
+- **JWT** — authentication
+- **golang.org/x/crypto** — password hashing (bcrypt)
+- **godotenv** — environment variables
+- **Bubble Tea / Lipgloss / Bubbles** — TUI CLI
 
 ## Help
 
-For issues, read the README files in each package or check inline comments in the code.
-
-Happy coding! 🚀
+See package-level `README.md` files and inline comments in the code.
