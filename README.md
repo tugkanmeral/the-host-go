@@ -13,12 +13,18 @@ the-host-go/
 │       └── main.go
 │
 ├── internal/
-│   ├── cli/                      # TUI screens, session, app loop
-│   ├── handlers/                 # HTTP handlers
-│   ├── service/                  # Business logic (Auth, Note, …)
-│   ├── models/                   # Entity + API DTOs
-│   ├── database/                 # MongoDB connection & access
-│   ├── middleware/               # HTTP middleware (e.g. JWT)
+│   ├── cli/                      # TUI entry: wires services and Bubble Tea program
+│   │   ├── app.go               # Run() — alt screen, program lifecycle
+│   │   ├── appsvc/              # Session + service calls for the TUI (login, notes CRUD)
+│   │   └── page/                # Screens, steps, menus, Bubble Tea model
+│   │       ├── notes/           # Note list UI (cards, paging, formatting)
+│   │       ├── passwords/       # Placeholder until passwords feature ships
+│   │       └── reminders/       # Placeholder until reminders feature ships
+│   ├── handlers/               # HTTP handlers
+│   ├── service/                # Business logic (Auth, Note, …)
+│   ├── models/                 # Entity + API DTOs
+│   ├── database/               # MongoDB connection & access
+│   ├── middleware/             # HTTP middleware (e.g. JWT)
 │   ├── auth/                     # JWT helpers, password hashing
 │   └── config/                   # Configuration loading
 │
@@ -32,7 +38,12 @@ the-host-go/
 |--------|---------|
 | `cmd/api` | Starts the Fiber server; registers `/api/auth` and `/api/note` routes. |
 | `cmd/cli` | Connects to MongoDB, loads config, runs the `internal/cli` TUI. |
-| `internal/cli` | Terminal UI (session, screens). |
+| `internal/cli` | TUI bootstrap: `Run()` delegates to `page` + `appsvc`. |
+| `internal/cli/appsvc` | TUI-side auth/session and note operations against `internal/service`. |
+| `internal/cli/page` | Bubble Tea model, steps, main vs Note/Password/Reminder menus, note flows. |
+| `internal/cli/page/notes` | List rendering, paging banner, note card styles. |
+| `internal/cli/page/passwords` | Placeholder UI for future password vault. |
+| `internal/cli/page/reminders` | Placeholder UI for future reminders. |
 | `internal/handlers` | REST endpoint implementations. |
 | `internal/service` | Shared domain logic for API and CLI. |
 | `internal/models` | Database entities and API models. |
@@ -41,6 +52,10 @@ the-host-go/
 | `internal/auth` | JWT issuance/validation, password helpers. |
 | `internal/config` | Environment / `.env` loading. |
 | `config/environments` | Per-environment `.env` files. |
+
+## TUI overview
+
+After sign-in, the CLI shows a **main menu** (Note, Password, Reminder, Quit). **Note** opens the **Note menu** (list, add, update, delete, quit). **Password** and **Reminder** currently show stub screens until those areas are implemented. Hub-style screens keep the banner logo; list and form flows use the full terminal height without the logo.
 
 ## Setup
 
@@ -93,7 +108,7 @@ go run ./cmd/cli
 2. **Database** (`internal/database/`) — CRUD / queries
 3. **Service** (`internal/service/`) — shared logic for API and CLI
 4. **Handlers** (`internal/handlers/`) — HTTP endpoints
-5. **CLI** (`internal/cli/`) — terminal flows and screens
+5. **CLI** (`internal/cli/`, `internal/cli/page/`, `internal/cli/appsvc/`) — terminal flows and screens
 6. **Routes** — Fiber groups in `cmd/api/main.go`
 7. **Verify** — via API client or the CLI
 
