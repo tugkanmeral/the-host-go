@@ -56,7 +56,7 @@ func (h *NoteHandler) Add(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(model.SuccessResponse{
-		Data: "Note saved successfully",
+		Message: "Note saved successfully",
 	})
 }
 
@@ -182,7 +182,7 @@ func (h *NoteHandler) Update(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(model.SuccessResponse{
-		Data: "Note updated successfully",
+		Message: "Note updated successfully",
 	})
 }
 
@@ -209,6 +209,6 @@ func (h *NoteHandler) Delete(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusOK).JSON(model.SuccessResponse{
-		Data: "Note deleted successfully",
+		Message: "Note deleted successfully",
 	})
 }

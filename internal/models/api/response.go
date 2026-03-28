@@ -5,7 +5,8 @@ type ErrorResponse struct {
 }
 
 type SuccessResponse struct {
-	Data any `json:"data"`
+	Data    any    `json:"data"`
+	Message string `json:"message"`
 }
 
 type ListResponse[T any] struct {

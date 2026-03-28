@@ -95,10 +95,14 @@ func (s *NoteService) GetList(ctx context.Context, ownerID string, skip, take in
 
 	noteListings := make([]model.NoteListingItemModel, 0, len(notes))
 	for _, note := range notes {
+		text := note.Text
+		if len(note.Text) > 25 {
+			text = note.Text[:25] + "..."
+		}
 		noteListings = append(noteListings, model.NoteListingItemModel{
 			Id:    note.ID.Hex(),
 			Title: note.Title,
-			Text:  note.Text,
+			Text:  text,
 			Tags:  note.Tags,
 		})
 	}
