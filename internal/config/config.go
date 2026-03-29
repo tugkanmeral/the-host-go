@@ -72,7 +72,6 @@ func LoadConfig() *Config {
 		log.Fatal("JWT_SECRET environment variable is required")
 	}
 
-	log.Printf("✓ Configuration loaded for environment: %s", config.Env)
 	return config
 }
 

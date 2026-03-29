@@ -45,8 +45,6 @@ func DisconnectDB() error {
 		panic(err)
 	}
 
-	log.Println("✓ MongoDB connection closed")
-
 	return nil
 }
 

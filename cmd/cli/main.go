@@ -19,7 +19,7 @@ func main() {
 	}
 	defer func() {
 		if err := database.DisconnectDB(); err != nil {
-			log.Printf("MongoDB bağlantısı kapatılırken hata: %v", err)
+			log.Fatalf("MongoDB bağlantısı kapatılırken hata: %v", err)
 		}
 	}()
 
