@@ -126,7 +126,27 @@ func renderNoteCard(it apimodel.NoteListingItemModel, termWidth int, idx int, pa
 	innerW := listInnerWidth(termWidth)
 	border := noteBorderColors[idx%len(noteBorderColors)]
 	titleLine := noteTitleStyle.Width(innerW).Render(it.Title)
-	idLine := noteIDStyle.Render(it.Id)
+
+	idLine := noteIDStyle.Width(innerW).Render(it.Id)
+	if hk, ok := hotkeyBadgeText(pagePos); ok {
+		badge := noteHotkeyStyle.Render(hk)
+		wBadge := lipgloss.Width(badge)
+		maxID := innerW - wBadge
+		if maxID < 1 {
+			maxID = 1
+		}
+		idPart := noteIDStyle.MaxWidth(maxID).Render(it.Id)
+		wID := lipgloss.Width(idPart)
+		gap := innerW - wID - wBadge
+		if gap < 0 {
+			gap = 0
+		}
+		idLine = lipgloss.JoinHorizontal(lipgloss.Top,
+			idPart,
+			lipgloss.NewStyle().Width(gap).Render(""),
+			badge,
+		)
+	}
 
 	body := strings.TrimSpace(it.Text)
 	tagsLine := renderHighlightedTags(it.Tags)
@@ -152,22 +172,6 @@ func renderNoteCard(it apimodel.NoteListingItemModel, termWidth int, idx int, pa
 	}
 	if hasTags {
 		lines = append(lines, tagsLine)
-	}
-
-	if hk, ok := hotkeyBadgeText(pagePos); ok {
-		badge := noteHotkeyStyle.Render(hk)
-		spacerW := innerW - lipgloss.Width(badge)
-		if spacerW < 0 {
-			spacerW = 0
-		}
-		hotkeyLine := lipgloss.JoinHorizontal(lipgloss.Left,
-			lipgloss.NewStyle().Width(spacerW).Render(""),
-			badge,
-		)
-		if hasBody || hasTags {
-			lines = append(lines, cardSeparator(innerW))
-		}
-		lines = append(lines, hotkeyLine)
 	}
 
 	core := lipgloss.JoinVertical(lipgloss.Left, lines...)
