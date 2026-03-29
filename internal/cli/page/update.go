@@ -57,6 +57,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "ctrl+q":
+			return m, tea.Quit
 		case "ctrl+c", "esc":
 			switch m.step {
 			case StepLoginUser, StepLoginPass, StepRootMenu:
@@ -273,7 +275,7 @@ func (m model) updateListView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		s := msg.String()
 		switch s {
-		case "enter", "q", "Q":
+		case "enter":
 			m.resetListView()
 			m.menuCursor = 0
 			m.step = StepNotesMenu
@@ -464,58 +466,58 @@ func (m model) View() string {
 		if m.errLine != "" {
 			s += "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(m.errLine)
 		}
-		v = pinFooterBelowContent(s, navHint("Enter: continue · Esc: quit"), m.height)
+		v = pinFooterBelowContent(s, navHint("Enter: continue · Esc or Ctrl+Q: quit"), m.height)
 	case StepLoginPass:
 		s := loginBranding() + "\n\n" + signInTitleStyle.Render("Sign in") + "\n\nPassword:\n" + m.passTI.View()
 		if m.errLine != "" {
 			s += "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(m.errLine)
 		}
-		v = pinFooterBelowContent(s, navHint("Enter: login · Esc: quit"), m.height)
+		v = pinFooterBelowContent(s, navHint("Enter: login · Esc or Ctrl+Q: quit"), m.height)
 	case StepRootMenu:
 		s := loginBranding() + "\n\n" + titleStyle.Render("Main menu") + "\n\n" + rootMenuRender(m)
-		v = pinFooterBelowContent(s, navHint("↑↓ j k · Enter · 1–3 q · Esc quit app"), m.height)
+		v = pinFooterBelowContent(s, navHint("↑↓ j k · Enter · 1–3 · Esc / Ctrl+Q: quit app"), m.height)
 	case StepNotesMenu:
 		s := loginBranding() + "\n\n" + titleStyle.Render("Note menu") + "\n\n" + notesMenuRender(m)
-		v = pinFooterBelowContent(s, navHint("↑↓ j k · Enter · 1–4 q shortcuts · Esc back"), m.height)
+		v = pinFooterBelowContent(s, navHint("↑↓ j k · Enter · 1–2 · Esc: back · Ctrl+Q: quit"), m.height)
 	case StepPasswordsMenu:
 		s := loginBranding() + "\n\n" + titleStyle.Render("Password menu") + "\n\n" + passwords.PlaceholderBody(sectionPlaceholderStyle)
-		v = pinFooterBelowContent(s, navHint("Esc: back to main menu"), m.height)
+		v = pinFooterBelowContent(s, navHint("Esc: back to main menu · Ctrl+Q: quit"), m.height)
 	case StepRemindersMenu:
 		s := loginBranding() + "\n\n" + titleStyle.Render("Reminder menu") + "\n\n" + reminders.PlaceholderBody(sectionPlaceholderStyle)
-		v = pinFooterBelowContent(s, navHint("Esc: back to main menu"), m.height)
+		v = pinFooterBelowContent(s, navHint("Esc: back to main menu · Ctrl+Q: quit"), m.height)
 	case StepListLoading:
 		v = notes.ScreenTitleStyle.Render("Notes") + "\n\n" + notes.LoadingStyle.Render("Loading notes…")
 	case StepListView:
 		banner := notes.ListViewPagingBanner(m.listItems, m.listTotal, m.listSkip, m.listTake)
 		v = notes.ScreenTitleStyle.Render("Notes") + "\n" + banner + "\n\n" + m.listVP.View() + "\n\n" +
-			navHint("0–9 = page size (0→10) · ←p →n [] · ↑↓jk scroll · Esc q Note menu")
+			navHint("0–9 = page size (0→10) · ←p →n [] · ↑↓jk scroll · Enter/Esc: Note menu · Ctrl+Q: quit")
 	case StepAddTitle:
 		s := titleStyle.Render("New note — title") + "\n\n" + m.titleTI.View()
-		v = pinFooterBelowContent(s, navHint("Enter: continue · Esc: menu"), m.height)
+		v = pinFooterBelowContent(s, navHint("Enter: continue · Esc: menu · Ctrl+Q: quit"), m.height)
 	case StepAddText:
 		s := titleStyle.Render("New note — body") + "\n\n" + m.bodyTA.View()
-		v = pinFooterBelowContent(s, navHint("Ctrl+E: continue · Esc: menu"), m.height)
+		v = pinFooterBelowContent(s, navHint("Ctrl+E: continue · Esc: menu · Ctrl+Q: quit"), m.height)
 	case StepAddTags:
 		s := titleStyle.Render("New note — tags (optional)") + "\n\n" + m.tagsTI.View()
-		v = pinFooterBelowContent(s, navHint("Enter: save · Esc: menu"), m.height)
+		v = pinFooterBelowContent(s, navHint("Enter: save · Esc: menu · Ctrl+Q: quit"), m.height)
 	case StepUpdateID:
 		s := titleStyle.Render("Update note — id") + "\n\n" + m.updIDTI.View()
-		v = pinFooterBelowContent(s, navHint("Enter: continue · Esc: menu"), m.height)
+		v = pinFooterBelowContent(s, navHint("Enter: continue · Esc: menu · Ctrl+Q: quit"), m.height)
 	case StepUpdateTitle:
 		s := titleStyle.Render("Update — title") + "\n\n" + m.updTitleTI.View()
-		v = pinFooterBelowContent(s, navHint("Enter: continue · Esc: menu"), m.height)
+		v = pinFooterBelowContent(s, navHint("Enter: continue · Esc: menu · Ctrl+Q: quit"), m.height)
 	case StepUpdateText:
 		s := titleStyle.Render("Update — text") + "\n\n" + m.updBodyTA.View()
-		v = pinFooterBelowContent(s, navHint("Ctrl+E: continue · Esc: menu"), m.height)
+		v = pinFooterBelowContent(s, navHint("Ctrl+E: continue · Esc: menu · Ctrl+Q: quit"), m.height)
 	case StepUpdateTags:
 		s := titleStyle.Render("Update — tags") + "\n\n" + m.updTagsTI.View()
 		if m.errLine != "" {
 			s += "\n\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(m.errLine)
 		}
-		v = pinFooterBelowContent(s, navHint("Enter: submit · Esc: menu"), m.height)
+		v = pinFooterBelowContent(s, navHint("Enter: submit · Esc: menu · Ctrl+Q: quit"), m.height)
 	case StepDeleteID:
 		s := titleStyle.Render("Delete note") + "\n\n" + m.delIDTI.View()
-		v = pinFooterBelowContent(s, navHint("Enter: delete · Esc: menu"), m.height)
+		v = pinFooterBelowContent(s, navHint("Enter: delete · Esc: menu · Ctrl+Q: quit"), m.height)
 	case StepInfo:
 		var s string
 		if m.errLine != "" {
@@ -523,7 +525,7 @@ func (m model) View() string {
 		} else {
 			s = m.info
 		}
-		v = pinFooterBelowContent(s, navHint("Press any key for Note menu."), m.height)
+		v = pinFooterBelowContent(s, navHint("Any key: Note menu · Ctrl+Q: quit"), m.height)
 	default:
 		v = ""
 	}

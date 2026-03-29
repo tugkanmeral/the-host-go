@@ -111,10 +111,10 @@ func cardSeparator(innerW int) string {
 	return cardDividerStyle.MarginLeft(2).MarginRight(2).Render(line)
 }
 
-func renderNoteCard(displayNo int, it apimodel.NoteListingItemModel, termWidth int, idx int) string {
+func renderNoteCard(it apimodel.NoteListingItemModel, termWidth int, idx int) string {
 	innerW := listInnerWidth(termWidth)
 	border := noteBorderColors[idx%len(noteBorderColors)]
-	titleLine := noteTitleStyle.Width(innerW).Render(fmt.Sprintf("%d - %s", displayNo, it.Title))
+	titleLine := noteTitleStyle.Width(innerW).Render(it.Title)
 	idLine := noteIDStyle.Render(it.Id)
 
 	body := strings.TrimSpace(it.Text)
@@ -163,8 +163,7 @@ func FormatNotesList(items []apimodel.NoteListingItemModel, skip, termWidth int)
 		return lipgloss.JoinVertical(lipgloss.Left, parts...)
 	}
 	for i, it := range items {
-		displayNo := skip + i + 1
-		parts = append(parts, renderNoteCard(displayNo, it, termWidth, i))
+		parts = append(parts, renderNoteCard(it, termWidth, i))
 		if i < len(items)-1 {
 			parts = append(parts, "")
 		}

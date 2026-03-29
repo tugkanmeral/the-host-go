@@ -14,7 +14,6 @@ var rootMenuRows = []struct {
 	{"1", "Note"},
 	{"2", "Password"},
 	{"3", "Reminder"},
-	{"q", "Quit"},
 }
 
 func rootMenuRender(m model) string {
@@ -46,8 +45,6 @@ func (m model) activateRootMenuSelection() (tea.Model, tea.Cmd) {
 	case 2:
 		m.step = StepRemindersMenu
 		return m, nil
-	case 3:
-		return m, tea.Quit
 	}
 	return m, nil
 }
@@ -74,9 +71,6 @@ func (m model) updateRootMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.activateRootMenuSelection()
 		case "3":
 			m.rootMenuCursor = 2
-			return m.activateRootMenuSelection()
-		case "q", "Q":
-			m.rootMenuCursor = 3
 			return m.activateRootMenuSelection()
 		}
 	}
