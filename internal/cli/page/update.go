@@ -116,6 +116,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.step = StepNotesMenu
 				m.info = ""
 				m.errLine = ""
+				m.infoReturnToList = false
 				return m, nil
 			}
 		}
@@ -137,6 +138,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case listDoneMsg:
 		if msg.err != nil {
 			m.info = ""
+			m.infoReturnToList = false
 			m.errLine = msg.err.Error()
 			m.step = StepInfo
 			return m, nil
@@ -155,6 +157,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case simpleErrMsg:
+		m.infoReturnToList = false
 		if m.detailDeleteLoading {
 			m.detailDeleteLoading = false
 			m.errLine = msg.err.Error()
@@ -175,15 +178,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			take := notes.NormalizeListTake(m.listTake)
 			return m, listCmd(m.svc, skip, take)
 		}
-		if m.step == StepUpdateTags {
-			m.errLine = ""
-			m.step = StepListLoading
-			skip := m.listSkip
-			take := notes.NormalizeListTake(m.listTake)
-			return m, listCmd(m.svc, skip, take)
-		}
 		m.errLine = ""
 		m.info = "Operation completed successfully."
+		if m.step == StepUpdateTags {
+			m.infoReturnToList = true
+		} else {
+			m.infoReturnToList = false
+		}
 		m.step = StepInfo
 		return m, nil
 
@@ -192,6 +193,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if msg.err != nil {
+			m.infoReturnToList = false
 			m.errLine = msg.err.Error()
 			m.step = StepInfo
 			return m, nil
@@ -623,14 +625,26 @@ func (m model) updateDeleteID(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) updateInfo(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if _, ok := msg.(tea.KeyMsg); ok {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if m.infoReturnToList && msg.String() == "enter" {
+			m.infoReturnToList = false
+			m.info = ""
+			m.errLine = ""
+			m.step = StepListLoading
+			skip := m.listSkip
+			take := notes.NormalizeListTake(m.listTake)
+			return m, listCmd(m.svc, skip, take)
+		}
 		m.menuCursor = 0
 		m.step = StepNotesMenu
 		m.info = ""
 		m.errLine = ""
+		m.infoReturnToList = false
+		return m, nil
+	default:
 		return m, nil
 	}
-	return m, nil
 }
 
 func (m model) View() string {
@@ -710,7 +724,11 @@ func (m model) View() string {
 		} else {
 			s = m.info
 		}
-		v = pinFooterBelowContent(s, navHint("Any key: Note menu · Ctrl+Q: quit"), m.height)
+		hint := "Any key: Note menu · Ctrl+Q: quit"
+		if m.infoReturnToList && m.errLine == "" {
+			hint = "Enter: notes list · Esc or any other key: note menu · Ctrl+Q: quit"
+		}
+		v = pinFooterBelowContent(s, navHint(hint), m.height)
 	default:
 		v = ""
 	}

@@ -46,6 +46,9 @@ type model struct {
 	info    string
 	errLine string
 
+	// infoReturnToList: StepInfo after successful note update — Enter loads the notes list.
+	infoReturnToList bool
+
 	width  int
 	height int
 
