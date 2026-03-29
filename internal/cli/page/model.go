@@ -40,6 +40,9 @@ type model struct {
 	noteDetail *apimodel.NoteModel
 	detailVP   viewport.Model
 
+	detailDeleteConfirm bool
+	detailDeleteLoading bool
+
 	info    string
 	errLine string
 
@@ -119,8 +122,8 @@ func newModel(svc *appsvc.AppServices) model {
 		updTagsTI:  utg,
 		delIDTI:    did,
 		listVP:     viewport.New(80, notes.ListScrollViewportHeight(24)),
-		detailVP: viewport.New(80, notes.DetailScrollViewportHeight(24)),
-		listTake: notes.DefaultListTake,
+		detailVP:   viewport.New(80, notes.DetailScrollViewportHeight(24)),
+		listTake:   notes.DefaultListTake,
 		width:      80,
 		height:     24,
 	}

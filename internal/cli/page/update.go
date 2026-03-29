@@ -7,10 +7,16 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	overlay "github.com/rmhubbert/bubbletea-overlay"
 	"github.com/tugkanmeral/the-host-go/internal/cli/page/notes"
 	"github.com/tugkanmeral/the-host-go/internal/cli/page/passwords"
 	"github.com/tugkanmeral/the-host-go/internal/cli/page/reminders"
 )
+
+// stringView adapts a rendered string for bubbletea-overlay's Viewable interface.
+type stringView string
+
+func (v stringView) View() string { return string(v) }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -84,6 +90,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errLine = ""
 				return m, nil
 			case StepNoteDetailView:
+				if m.detailDeleteLoading {
+					return m, nil
+				}
+				if m.detailDeleteConfirm {
+					m.detailDeleteConfirm = false
+					return m, nil
+				}
 				m.noteDetail = nil
 				m.step = StepListView
 				m.errLine = ""
@@ -142,11 +155,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case simpleErrMsg:
+		if m.detailDeleteLoading {
+			m.detailDeleteLoading = false
+			m.errLine = msg.err.Error()
+			m.step = StepInfo
+			return m, nil
+		}
 		m.errLine = msg.err.Error()
 		m.step = StepInfo
 		return m, nil
 
 	case simpleOkMsg:
+		if m.detailDeleteLoading {
+			m.detailDeleteLoading = false
+			m.noteDetail = nil
+			m.errLine = ""
+			m.step = StepListLoading
+			skip := m.listSkip
+			take := notes.NormalizeListTake(m.listTake)
+			return m, listCmd(m.svc, skip, take)
+		}
+		if m.step == StepUpdateTags {
+			m.errLine = ""
+			m.step = StepListLoading
+			skip := m.listSkip
+			take := notes.NormalizeListTake(m.listTake)
+			return m, listCmd(m.svc, skip, take)
+		}
 		m.errLine = ""
 		m.info = "Operation completed successfully."
 		m.step = StepInfo
@@ -385,15 +420,60 @@ func (m model) updateListView(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) updateNoteDetailView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if m.detailDeleteLoading {
+			return m, nil
+		}
+		if m.detailDeleteConfirm {
+			switch msg.String() {
+			case "y", "Y":
+				if m.noteDetail == nil {
+					m.detailDeleteConfirm = false
+					return m, nil
+				}
+				id := m.noteDetail.Id
+				m.detailDeleteConfirm = false
+				m.detailDeleteLoading = true
+				return m, deleteCmd(m.svc, id)
+			case "n", "N":
+				m.detailDeleteConfirm = false
+				return m, nil
+			}
+			return m, nil
+		}
+		switch msg.String() {
+		case "u", "U":
+			return m.openUpdateFromNoteDetail()
+		case "d", "D":
+			m.detailDeleteConfirm = true
+			return m, nil
+		}
 		var cmd tea.Cmd
 		m.detailVP, cmd = m.detailVP.Update(msg)
 		return m, cmd
 	case tea.MouseMsg:
+		if m.detailDeleteConfirm || m.detailDeleteLoading {
+			return m, nil
+		}
 		var cmd tea.Cmd
 		m.detailVP, cmd = m.detailVP.Update(msg)
 		return m, cmd
 	}
 	return m, nil
+}
+
+func (m model) openUpdateFromNoteDetail() (tea.Model, tea.Cmd) {
+	if m.noteDetail == nil {
+		return m, nil
+	}
+	n := m.noteDetail
+	m.updIDTI.SetValue(n.Id)
+	m.updTitleTI.SetValue(n.Title)
+	m.updBodyTA.SetValue(n.Text)
+	m.updTagsTI.SetValue(strings.Join(n.Tags, ", "))
+	m.errLine = ""
+	m.updTitleTI.Focus()
+	m.step = StepUpdateTitle
+	return m, textinput.Blink
 }
 
 func (m model) updateAddTitle(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -590,7 +670,12 @@ func (m model) View() string {
 		v = notes.ScreenTitleStyle.Render("Notes") + "\n\n" + notes.LoadingStyle.Render("Loading note…")
 	case StepNoteDetailView:
 		s := notes.ScreenTitleStyle.Render("Note detail") + "\n\n" + m.detailVP.View()
-		v = pinFooterBelowContent(s, navHint("Esc: back to list · ↑↓jk scroll · Ctrl+Q: quit"), m.height)
+		hint := navHint("Esc: back to list · u: update · d: delete · ↑↓jk scroll · Ctrl+Q: quit")
+		v = pinFooterBelowContent(s, hint, m.height)
+		if m.detailDeleteConfirm {
+			dlg := notes.FormatDeleteConfirmDialog()
+			v = overlay.New(stringView(dlg), stringView(v), overlay.Center, overlay.Center, 0, 0).View()
+		}
 	case StepAddTitle:
 		s := titleStyle.Render("New note — title") + "\n\n" + m.titleTI.View()
 		v = pinFooterBelowContent(s, navHint("Enter: continue · Esc: menu · Ctrl+Q: quit"), m.height)

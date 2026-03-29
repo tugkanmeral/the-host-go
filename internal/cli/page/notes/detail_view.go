@@ -13,7 +13,22 @@ var (
 	detailTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F5C2E7"))
 	detailMetaStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Faint(true)
 	detailBodyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#CDD6F4"))
+
+	deleteConfirmBorderStyle = lipgloss.NewStyle().
+					Border(lipgloss.RoundedBorder()).
+					BorderForeground(lipgloss.Color("#F38BA8")).
+					Padding(1, 2)
+	deleteConfirmTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#F5C2E7"))
+	deleteConfirmHintStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#CDD6F4"))
 )
+
+// FormatDeleteConfirmDialog renders the foreground for the delete-confirmation overlay.
+func FormatDeleteConfirmDialog() string {
+	title := deleteConfirmTitleStyle.Render("Delete this note?")
+	opts := deleteConfirmHintStyle.Render("[y] Yes    [n] No")
+	inner := lipgloss.JoinVertical(lipgloss.Left, title, "", opts)
+	return deleteConfirmBorderStyle.Render(inner)
+}
 
 func FormatNoteDetail(note *apimodel.NoteModel, termWidth int) string {
 	if note == nil {
