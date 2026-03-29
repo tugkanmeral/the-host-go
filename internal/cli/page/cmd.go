@@ -20,6 +20,11 @@ type listDoneMsg struct {
 type simpleErrMsg struct{ err error }
 type simpleOkMsg struct{}
 
+type noteDetailDoneMsg struct {
+	note *apimodel.NoteModel
+	err  error
+}
+
 func loginCmd(svc *appsvc.AppServices, user, pass string) tea.Cmd {
 	return func() tea.Msg {
 		return loginDoneMsg{err: svc.Login(context.Background(), user, pass)}
@@ -34,6 +39,13 @@ func listCmd(svc *appsvc.AppServices, skip, take int) tea.Cmd {
 			return listDoneMsg{err: err}
 		}
 		return listDoneMsg{items: items, total: total, skip: skip, take: take}
+	}
+}
+
+func getNoteCmd(svc *appsvc.AppServices, noteID string) tea.Cmd {
+	return func() tea.Msg {
+		note, err := svc.GetNote(context.Background(), noteID)
+		return noteDetailDoneMsg{note: note, err: err}
 	}
 }
 

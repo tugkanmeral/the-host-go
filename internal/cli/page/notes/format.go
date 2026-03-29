@@ -2,6 +2,7 @@ package notes
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -111,7 +112,17 @@ func cardSeparator(innerW int) string {
 	return cardDividerStyle.MarginLeft(2).MarginRight(2).Render(line)
 }
 
-func renderNoteCard(it apimodel.NoteListingItemModel, termWidth int, idx int) string {
+func hotkeyBadgeText(pagePos int) (label string, ok bool) {
+	if pagePos < 1 || pagePos > 10 {
+		return "", false
+	}
+	if pagePos == 10 {
+		return "0", true
+	}
+	return strconv.Itoa(pagePos), true
+}
+
+func renderNoteCard(it apimodel.NoteListingItemModel, termWidth int, idx int, pagePos int) string {
 	innerW := listInnerWidth(termWidth)
 	border := noteBorderColors[idx%len(noteBorderColors)]
 	titleLine := noteTitleStyle.Width(innerW).Render(it.Title)
@@ -143,6 +154,22 @@ func renderNoteCard(it apimodel.NoteListingItemModel, termWidth int, idx int) st
 		lines = append(lines, tagsLine)
 	}
 
+	if hk, ok := hotkeyBadgeText(pagePos); ok {
+		badge := noteHotkeyStyle.Render(hk)
+		spacerW := innerW - lipgloss.Width(badge)
+		if spacerW < 0 {
+			spacerW = 0
+		}
+		hotkeyLine := lipgloss.JoinHorizontal(lipgloss.Left,
+			lipgloss.NewStyle().Width(spacerW).Render(""),
+			badge,
+		)
+		if hasBody || hasTags {
+			lines = append(lines, cardSeparator(innerW))
+		}
+		lines = append(lines, hotkeyLine)
+	}
+
 	core := lipgloss.JoinVertical(lipgloss.Left, lines...)
 	maxOuter := termWidth - 2
 	if maxOuter < 28 {
@@ -163,7 +190,7 @@ func FormatNotesList(items []apimodel.NoteListingItemModel, skip, termWidth int)
 		return lipgloss.JoinVertical(lipgloss.Left, parts...)
 	}
 	for i, it := range items {
-		parts = append(parts, renderNoteCard(it, termWidth, i))
+		parts = append(parts, renderNoteCard(it, termWidth, i, i+1))
 		if i < len(items)-1 {
 			parts = append(parts, "")
 		}

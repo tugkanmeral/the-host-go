@@ -53,6 +53,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.listVP.Width = m.width
 			m.listVP.Height = notes.ListScrollViewportHeight(m.height)
 		}
+		if m.step == StepNoteDetailView && m.noteDetail != nil {
+			m.detailVP.SetContent(notes.FormatNoteDetail(m.noteDetail, m.width))
+			m.detailVP.Width = m.width
+			m.detailVP.Height = notes.DetailScrollViewportHeight(m.height)
+		}
 		return m, nil
 
 	case tea.KeyMsg:
@@ -72,6 +77,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.resetListView()
 				m.menuCursor = 0
 				m.step = StepNotesMenu
+				m.errLine = ""
+				return m, nil
+			case StepNoteDetailLoading:
+				m.step = StepListView
+				m.errLine = ""
+				return m, nil
+			case StepNoteDetailView:
+				m.noteDetail = nil
+				m.step = StepListView
 				m.errLine = ""
 				return m, nil
 			case StepListLoading:
@@ -123,6 +137,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.listVP.Width = m.width
 		m.listVP.Height = notes.ListScrollViewportHeight(m.height)
 		m.listVP.GotoTop()
+		m.listAwaitTakeDigit = false
 		m.step = StepListView
 		return m, nil
 
@@ -135,6 +150,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errLine = ""
 		m.info = "Operation completed successfully."
 		m.step = StepInfo
+		return m, nil
+
+	case noteDetailDoneMsg:
+		if m.step != StepNoteDetailLoading {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.errLine = msg.err.Error()
+			m.step = StepInfo
+			return m, nil
+		}
+		m.noteDetail = msg.note
+		m.detailVP.SetContent(notes.FormatNoteDetail(m.noteDetail, m.width))
+		m.detailVP.Width = m.width
+		m.detailVP.Height = notes.DetailScrollViewportHeight(m.height)
+		m.detailVP.GotoTop()
+		m.step = StepNoteDetailView
 		return m, nil
 	}
 
@@ -155,6 +187,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case StepListView:
 		return m.updateListView(msg)
+	case StepNoteDetailLoading:
+		return m, nil
+	case StepNoteDetailView:
+		return m.updateNoteDetailView(msg)
 	case StepAddTitle:
 		return m.updateAddTitle(msg)
 	case StepAddText:
@@ -220,6 +256,7 @@ func (m model) updateLoginPass(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) reloadListWithTake(newTake int) (tea.Model, tea.Cmd) {
+	m.listAwaitTakeDigit = false
 	newTake = notes.NormalizeListTake(newTake)
 	skip := m.listSkip
 	if newTake != m.listTake {
@@ -232,6 +269,7 @@ func (m model) reloadListWithTake(newTake int) (tea.Model, tea.Cmd) {
 }
 
 func (m model) listLoadPrevPage() (tea.Model, tea.Cmd) {
+	m.listAwaitTakeDigit = false
 	take := notes.NormalizeListTake(m.listTake)
 	if m.listSkip <= 0 {
 		return m, nil
@@ -246,6 +284,7 @@ func (m model) listLoadPrevPage() (tea.Model, tea.Cmd) {
 }
 
 func (m model) listLoadNextPage() (tea.Model, tea.Cmd) {
+	m.listAwaitTakeDigit = false
 	take := notes.NormalizeListTake(m.listTake)
 	if m.listSkip+take >= m.listTotal {
 		return m, nil
@@ -270,19 +309,61 @@ func listTakeFromDigitKey(msg tea.KeyMsg) (take int, ok bool) {
 	return int(r - '0'), true
 }
 
+// listDigitNoteOrTake returns note index to open (>=0), or take > 0 for page size, when digit key was pressed.
+func listDigitNoteOrTake(msg tea.KeyMsg, nItems int) (noteIdx int, take int, ok bool) {
+	noteIdx = -1
+	take = -1
+	if msg.Type != tea.KeyRunes || msg.Paste || len(msg.Runes) != 1 {
+		return -1, -1, false
+	}
+	r := msg.Runes[0]
+	if r < '0' || r > '9' {
+		return -1, -1, false
+	}
+	if r == '0' {
+		if nItems >= 10 {
+			return 9, -1, true
+		}
+		return -1, 10, true
+	}
+	d := int(r - '0')
+	if d <= nItems {
+		return d - 1, -1, true
+	}
+	return -1, d, true
+}
+
 func (m model) updateListView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		s := msg.String()
 		switch s {
 		case "enter":
+			m.listAwaitTakeDigit = false
 			m.resetListView()
 			m.menuCursor = 0
 			m.step = StepNotesMenu
 			return m, nil
 		}
-		if take, ok := listTakeFromDigitKey(msg); ok {
-			return m.reloadListWithTake(take)
+		if m.listAwaitTakeDigit {
+			if tk, ok := listTakeFromDigitKey(msg); ok {
+				return m.reloadListWithTake(tk)
+			}
+			m.listAwaitTakeDigit = false
+		}
+		if s == "t" {
+			m.listAwaitTakeDigit = true
+			return m, nil
+		}
+		if ni, tk, ok := listDigitNoteOrTake(msg, len(m.listItems)); ok {
+			if ni >= 0 {
+				id := m.listItems[ni].Id
+				m.step = StepNoteDetailLoading
+				return m, getNoteCmd(m.svc, id)
+			}
+			if tk > 0 {
+				return m.reloadListWithTake(tk)
+			}
 		}
 		switch s {
 		case "[", "left", "p":
@@ -296,6 +377,20 @@ func (m model) updateListView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMsg:
 		var cmd tea.Cmd
 		m.listVP, cmd = m.listVP.Update(msg)
+		return m, cmd
+	}
+	return m, nil
+}
+
+func (m model) updateNoteDetailView(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		var cmd tea.Cmd
+		m.detailVP, cmd = m.detailVP.Update(msg)
+		return m, cmd
+	case tea.MouseMsg:
+		var cmd tea.Cmd
+		m.detailVP, cmd = m.detailVP.Update(msg)
 		return m, cmd
 	}
 	return m, nil
@@ -490,7 +585,12 @@ func (m model) View() string {
 	case StepListView:
 		banner := notes.ListViewPagingBanner(m.listItems, m.listTotal, m.listSkip, m.listTake)
 		v = notes.ScreenTitleStyle.Render("Notes") + "\n" + banner + "\n\n" + m.listVP.View() + "\n\n" +
-			navHint("0–9 = page size (0→10) · ←p →n [] · ↑↓jk scroll · Enter/Esc: Note menu · Ctrl+Q: quit")
+			navHint("1–9/0 open note on page · t+digit page size · spare digit page size · ←p →n [] · ↑↓jk scroll · Enter/Esc menu · Ctrl+Q: quit")
+	case StepNoteDetailLoading:
+		v = notes.ScreenTitleStyle.Render("Notes") + "\n\n" + notes.LoadingStyle.Render("Loading note…")
+	case StepNoteDetailView:
+		s := notes.ScreenTitleStyle.Render("Note detail") + "\n\n" + m.detailVP.View()
+		v = pinFooterBelowContent(s, navHint("Esc: back to list · ↑↓jk scroll · Ctrl+Q: quit"), m.height)
 	case StepAddTitle:
 		s := titleStyle.Render("New note — title") + "\n\n" + m.titleTI.View()
 		v = pinFooterBelowContent(s, navHint("Enter: continue · Esc: menu · Ctrl+Q: quit"), m.height)
@@ -532,7 +632,7 @@ func (m model) View() string {
 	// List screens use manual viewport height; pad clears scrollback below the nav line.
 	// pinFooterBelowContent already sizes to term height — extra pad would add blank lines *under* the hint.
 	switch m.step {
-	case StepListView, StepListLoading:
+	case StepListView, StepListLoading, StepNoteDetailLoading:
 		return padViewToTerminalHeight(v, m.height)
 	default:
 		if v == "" {

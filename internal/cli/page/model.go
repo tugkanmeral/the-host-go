@@ -34,8 +34,14 @@ type model struct {
 	listSkip  int
 	listTake  int
 	listVP    viewport.Model
-	info      string
-	errLine   string
+
+	listAwaitTakeDigit bool
+
+	noteDetail *apimodel.NoteModel
+	detailVP   viewport.Model
+
+	info    string
+	errLine string
 
 	width  int
 	height int
@@ -113,7 +119,8 @@ func newModel(svc *appsvc.AppServices) model {
 		updTagsTI:  utg,
 		delIDTI:    did,
 		listVP:     viewport.New(80, notes.ListScrollViewportHeight(24)),
-		listTake:   notes.DefaultListTake,
+		detailVP: viewport.New(80, notes.DetailScrollViewportHeight(24)),
+		listTake: notes.DefaultListTake,
 		width:      80,
 		height:     24,
 	}

@@ -5,5 +5,6 @@ func (m *model) resetListView() {
 	m.listItems = nil
 	m.listTotal = 0
 	m.listSkip = 0
+	m.listAwaitTakeDigit = false
 	m.listVP.SetContent("")
 }

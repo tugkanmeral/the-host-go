@@ -28,4 +28,10 @@ var (
 		lipgloss.Color("#CBA6F7"),
 		lipgloss.Color("#F9E2AF"),
 	}
+
+	noteHotkeyStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#11111B")).
+			Background(lipgloss.Color("#F9E2AF")).
+			Padding(0, 1)
 )

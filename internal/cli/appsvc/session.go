@@ -42,6 +42,14 @@ func (a *AppServices) ListNotes(ctx context.Context, skip, take int) ([]apimodel
 	return result.Items, result.TotalCount, nil
 }
 
+func (a *AppServices) GetNote(ctx context.Context, noteID string) (*apimodel.NoteModel, error) {
+	note, err := a.Notes.Get(ctx, a.userID, noteID)
+	if err != nil {
+		return nil, formatServiceError(err)
+	}
+	return note, nil
+}
+
 func (a *AppServices) AddNote(ctx context.Context, title, text string, tags []string) error {
 	err := a.Notes.Add(ctx, a.userID, title, text, tags)
 	if err != nil {

@@ -11,6 +11,8 @@ const (
 	StepRemindersMenu
 	StepListLoading
 	StepListView
+	StepNoteDetailLoading
+	StepNoteDetailView
 	StepAddTitle
 	StepAddText
 	StepAddTags
