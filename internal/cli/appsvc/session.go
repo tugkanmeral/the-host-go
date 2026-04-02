@@ -35,7 +35,7 @@ func (a *AppServices) Login(ctx context.Context, username, password string) erro
 }
 
 func (a *AppServices) ListNotes(ctx context.Context, skip, take int) ([]apimodel.NoteListingItemModel, int, error) {
-	result, err := a.Notes.GetList(ctx, a.userID, int64(skip), int64(take))
+	result, err := a.Notes.GetList(ctx, a.userID, int64(skip), int64(take), "")
 	if err != nil {
 		return nil, 0, formatServiceError(err)
 	}

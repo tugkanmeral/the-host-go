@@ -70,6 +70,7 @@ func (h *NoteHandler) GetList(c *fiber.Ctx) error {
 
 	skipStr := c.Query("skip", "0")
 	takeStr := c.Query("take", "10")
+	searchTerm := c.Query("searchTerm", "")
 
 	skip, err := strconv.ParseInt(skipStr, 10, 64)
 	if err != nil {
@@ -81,7 +82,7 @@ func (h *NoteHandler) GetList(c *fiber.Ctx) error {
 		take = 10
 	}
 
-	result, err := h.notes.GetList(c.UserContext(), userID, skip, take)
+	result, err := h.notes.GetList(c.UserContext(), userID, skip, take, searchTerm)
 	if err != nil {
 		if errors.Is(err, service.ErrEmptyOwnerID) {
 			return c.Status(fiber.StatusBadRequest).JSON(model.ErrorResponse{

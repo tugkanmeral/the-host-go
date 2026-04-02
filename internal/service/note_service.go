@@ -55,7 +55,7 @@ func (s *NoteService) Add(ctx context.Context, ownerID, title, text string, tags
 	return nil
 }
 
-func (s *NoteService) GetList(ctx context.Context, ownerID string, skip, take int64) (*NoteListResult, error) {
+func (s *NoteService) GetList(ctx context.Context, ownerID string, skip, take int64, searchTerm string) (*NoteListResult, error) {
 	if ownerID == "" {
 		return nil, ErrEmptyOwnerID
 	}
@@ -63,24 +63,32 @@ func (s *NoteService) GetList(ctx context.Context, ownerID string, skip, take in
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	pipeline := bson.A{
-		bson.M{
-			"$match": bson.M{
-				"ownerId": ownerID,
-			},
-		},
-		bson.M{
-			"$sort": bson.M{
-				"creationDate": -1,
-			},
-		},
-		bson.M{
-			"$skip": skip,
-		},
-		bson.M{
-			"$limit": take,
-		},
+	var pipeline bson.A
+
+	// 1. MATCH
+	matchStage := bson.M{"ownerId": ownerID}
+	if searchTerm != "" {
+		matchStage["$text"] = bson.M{"$search": searchTerm}
 	}
+	pipeline = append(pipeline, bson.M{"$match": matchStage})
+
+	// 2. SORT
+	sortStage := bson.D{}
+	if searchTerm != "" {
+		pipeline = append(pipeline, bson.M{
+			"$addFields": bson.M{
+				"score": bson.M{"$meta": "textScore"},
+			},
+		})
+		sortStage = bson.D{{Key: "score", Value: bson.M{"$meta": "textScore"}}}
+	} else {
+		sortStage = bson.D{{Key: "creationDate", Value: -1}}
+	}
+	pipeline = append(pipeline, bson.M{"$sort": sortStage})
+
+	// 3. PAGINATION
+	pipeline = append(pipeline, bson.M{"$skip": skip})
+	pipeline = append(pipeline, bson.M{"$limit": take})
 
 	cursor, err := s.db.Collection(database.NoteCollectionName).Aggregate(ctx, pipeline)
 	if err != nil {
@@ -107,9 +115,11 @@ func (s *NoteService) GetList(ctx context.Context, ownerID string, skip, take in
 		})
 	}
 
-	totalCount, err := s.db.Collection(database.NoteCollectionName).CountDocuments(ctx, bson.M{
-		"ownerId": ownerID,
-	})
+	countFilter := bson.M{"ownerId": ownerID}
+	if searchTerm != "" {
+		countFilter["$text"] = bson.M{"$search": searchTerm}
+	}
+	totalCount, err := s.db.Collection(database.NoteCollectionName).CountDocuments(ctx, countFilter)
 	if err != nil {
 		totalCount = 0
 	}
