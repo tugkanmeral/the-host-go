@@ -28,12 +28,17 @@ type model struct {
 
 	delIDTI textinput.Model
 
-	listText  string
-	listItems []apimodel.NoteListingItemModel
-	listTotal int
-	listSkip  int
-	listTake  int
-	listVP    viewport.Model
+	listText          string
+	listItems         []apimodel.NoteListingItemModel
+	listTotal         int
+	listSkip          int
+	listTake          int
+	listVP            viewport.Model
+	listLoading       bool
+	listSearchTI      textinput.Model
+	listSearchActive  bool
+	listSearchApplied string
+	listRequestID     int
 
 	listAwaitTakeDigit bool
 
@@ -111,24 +116,30 @@ func newModel(svc *appsvc.AppServices) model {
 	did.CharLimit = 32
 	did.Width = 40
 
+	search := textinput.New()
+	search.Placeholder = "search notes"
+	search.CharLimit = 200
+	search.Width = 40
+
 	return model{
-		svc:        svc,
-		step:       StepLoginUser,
-		userTI:     ui,
-		passTI:     pi,
-		titleTI:    tti,
-		bodyTA:     ta,
-		tagsTI:     tagi,
-		updIDTI:    uid,
-		updTitleTI: ut,
-		updBodyTA:  uta,
-		updTagsTI:  utg,
-		delIDTI:    did,
-		listVP:     viewport.New(80, notes.ListScrollViewportHeight(24)),
-		detailVP:   viewport.New(80, notes.DetailScrollViewportHeight(24)),
-		listTake:   notes.DefaultListTake,
-		width:      80,
-		height:     24,
+		svc:          svc,
+		step:         StepLoginUser,
+		userTI:       ui,
+		passTI:       pi,
+		titleTI:      tti,
+		bodyTA:       ta,
+		tagsTI:       tagi,
+		updIDTI:      uid,
+		updTitleTI:   ut,
+		updBodyTA:    uta,
+		updTagsTI:    utg,
+		delIDTI:      did,
+		listSearchTI: search,
+		listVP:       viewport.New(80, notes.ListScrollViewportHeight(24)),
+		detailVP:     viewport.New(80, notes.DetailScrollViewportHeight(24)),
+		listTake:     notes.DefaultListTake,
+		width:        80,
+		height:       24,
 	}
 }
 

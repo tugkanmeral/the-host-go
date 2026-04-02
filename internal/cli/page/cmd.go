@@ -11,11 +11,13 @@ import (
 
 type loginDoneMsg struct{ err error }
 type listDoneMsg struct {
-	items []apimodel.NoteListingItemModel
-	total int
-	skip  int
-	take  int
-	err   error
+	items      []apimodel.NoteListingItemModel
+	total      int
+	skip       int
+	take       int
+	searchTerm string
+	requestID  int
+	err        error
 }
 type simpleErrMsg struct{ err error }
 type simpleOkMsg struct{}
@@ -31,14 +33,21 @@ func loginCmd(svc *appsvc.AppServices, user, pass string) tea.Cmd {
 	}
 }
 
-func listCmd(svc *appsvc.AppServices, skip, take int) tea.Cmd {
+func listCmd(svc *appsvc.AppServices, skip, take int, searchTerm string, requestID int) tea.Cmd {
 	take = notes.NormalizeListTake(take)
 	return func() tea.Msg {
-		items, total, err := svc.ListNotes(context.Background(), skip, take)
+		items, total, err := svc.ListNotes(context.Background(), skip, take, searchTerm)
 		if err != nil {
-			return listDoneMsg{err: err}
+			return listDoneMsg{searchTerm: searchTerm, requestID: requestID, err: err}
 		}
-		return listDoneMsg{items: items, total: total, skip: skip, take: take}
+		return listDoneMsg{
+			items:      items,
+			total:      total,
+			skip:       skip,
+			take:       take,
+			searchTerm: searchTerm,
+			requestID:  requestID,
+		}
 	}
 }
 

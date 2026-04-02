@@ -35,6 +35,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updTitleTI.Width = w
 		m.updTagsTI.Width = w
 		m.delIDTI.Width = w
+		m.listSearchTI.Width = w
 		m.bodyTA.SetWidth(w)
 		bodyH := msg.Height / 4
 		if bodyH < 4 {
@@ -57,7 +58,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.listText = notes.FormatNotesList(m.listItems, m.listSkip, m.width)
 			m.listVP.SetContent(m.listText)
 			m.listVP.Width = m.width
-			m.listVP.Height = notes.ListScrollViewportHeight(m.height)
+			m.listVP.Height = m.listViewportHeight()
 		}
 		if m.step == StepNoteDetailView && m.noteDetail != nil {
 			m.detailVP.SetContent(notes.FormatNoteDetail(m.noteDetail, m.width))
@@ -80,6 +81,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errLine = ""
 				return m, nil
 			case StepListView:
+				if m.listSearchActive {
+					m.closeListSearch()
+					return m, nil
+				}
 				m.resetListView()
 				m.menuCursor = 0
 				m.step = StepNotesMenu
@@ -102,6 +107,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.errLine = ""
 				return m, nil
 			case StepListLoading:
+				m.resetListView()
 				m.step = StepNotesMenu
 				m.errLine = ""
 				return m, nil
@@ -136,7 +142,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg { return tea.ClearScreen() }
 
 	case listDoneMsg:
+		if msg.requestID != m.listRequestID {
+			return m, nil
+		}
 		if msg.err != nil {
+			m.listLoading = false
 			m.info = ""
 			m.infoReturnToList = false
 			m.errLine = msg.err.Error()
@@ -147,10 +157,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.listTotal = msg.total
 		m.listSkip = msg.skip
 		m.listTake = msg.take
+		m.listLoading = false
+		m.listSearchApplied = msg.searchTerm
 		m.listText = notes.FormatNotesList(msg.items, msg.skip, m.width)
 		m.listVP.SetContent(m.listText)
 		m.listVP.Width = m.width
-		m.listVP.Height = notes.ListScrollViewportHeight(m.height)
+		m.listVP.Height = m.listViewportHeight()
 		m.listVP.GotoTop()
 		m.listAwaitTakeDigit = false
 		m.step = StepListView
@@ -173,10 +185,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.detailDeleteLoading = false
 			m.noteDetail = nil
 			m.errLine = ""
-			m.step = StepListLoading
-			skip := m.listSkip
-			take := notes.NormalizeListTake(m.listTake)
-			return m, listCmd(m.svc, skip, take)
+			return m.startListLoad(m.listSkip, notes.NormalizeListTake(m.listTake), m.listSearchApplied, false)
 		}
 		m.errLine = ""
 		m.info = "Operation completed successfully."
@@ -299,10 +308,7 @@ func (m model) reloadListWithTake(newTake int) (tea.Model, tea.Cmd) {
 	if newTake != m.listTake {
 		skip = 0
 	}
-	m.listSkip = skip
-	m.listTake = newTake
-	m.step = StepListLoading
-	return m, listCmd(m.svc, skip, newTake)
+	return m.startListLoad(skip, newTake, m.listSearchApplied, true)
 }
 
 func (m model) listLoadPrevPage() (tea.Model, tea.Cmd) {
@@ -315,9 +321,7 @@ func (m model) listLoadPrevPage() (tea.Model, tea.Cmd) {
 	if ns < 0 {
 		ns = 0
 	}
-	m.listSkip = ns
-	m.step = StepListLoading
-	return m, listCmd(m.svc, ns, take)
+	return m.startListLoad(ns, take, m.listSearchApplied, true)
 }
 
 func (m model) listLoadNextPage() (tea.Model, tea.Cmd) {
@@ -327,9 +331,7 @@ func (m model) listLoadNextPage() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	ns := m.listSkip + take
-	m.listSkip = ns
-	m.step = StepListLoading
-	return m, listCmd(m.svc, ns, take)
+	return m.startListLoad(ns, take, m.listSearchApplied, true)
 }
 
 func listTakeFromDigitKey(msg tea.KeyMsg) (take int, ok bool) {
@@ -370,10 +372,120 @@ func listDigitNoteOrTake(msg tea.KeyMsg, nItems int) (noteIdx int, take int, ok 
 	return -1, d, true
 }
 
+func isListSearchShortcut(key string) bool {
+	switch key {
+	case "ctrl+f", "cmd+f", "meta+f":
+		return true
+	default:
+		return false
+	}
+}
+
+func shouldAutoSearch(term string) bool {
+	n := len([]rune(strings.TrimSpace(term)))
+	return n > 0 && n%3 == 0
+}
+
+func (m model) showListSearchLine() bool {
+	return m.listSearchActive || m.listSearchApplied != ""
+}
+
+func (m model) listViewportHeight() int {
+	h := notes.ListScrollViewportHeight(m.height)
+	if m.showListSearchLine() {
+		h--
+	}
+	if h < 4 {
+		h = 4
+	}
+	return h
+}
+
+func (m *model) closeListSearch() {
+	m.listSearchActive = false
+	m.listSearchTI.Blur()
+	m.listVP.Height = m.listViewportHeight()
+}
+
+func (m model) listSearchLine() string {
+	label := "Search: "
+	if m.listSearchActive {
+		line := label + m.listSearchTI.View()
+		if m.listLoading {
+			line += "  (searching...)"
+		}
+		return line
+	}
+	line := label + m.listSearchApplied
+	if line == label {
+		line += "-"
+	}
+	if m.listLoading {
+		line += "  (searching...)"
+	}
+	return line
+}
+
+func (m model) startListLoad(skip, take int, searchTerm string, keepView bool) (tea.Model, tea.Cmd) {
+	searchTerm = strings.TrimSpace(searchTerm)
+	take = notes.NormalizeListTake(take)
+	if skip < 0 {
+		skip = 0
+	}
+	m.listAwaitTakeDigit = false
+	m.listSkip = skip
+	m.listTake = take
+	m.listLoading = true
+	m.listRequestID++
+	if keepView {
+		m.step = StepListView
+	} else {
+		m.step = StepListLoading
+	}
+	return m, listCmd(m.svc, skip, take, searchTerm, m.listRequestID)
+}
+
+func (m model) updateListSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		return m.startListLoad(0, notes.NormalizeListTake(m.listTake), m.listSearchTI.Value(), true)
+	}
+
+	prev := strings.TrimSpace(m.listSearchTI.Value())
+	var cmd tea.Cmd
+	m.listSearchTI, cmd = m.listSearchTI.Update(msg)
+	current := strings.TrimSpace(m.listSearchTI.Value())
+	if current == prev {
+		return m, cmd
+	}
+	if current == "" {
+		if m.listSearchApplied == "" {
+			return m, cmd
+		}
+		nextModel, nextCmd := m.startListLoad(0, notes.NormalizeListTake(m.listTake), "", true)
+		return nextModel, tea.Batch(cmd, nextCmd)
+	}
+	if shouldAutoSearch(current) {
+		nextModel, nextCmd := m.startListLoad(0, notes.NormalizeListTake(m.listTake), current, true)
+		return nextModel, tea.Batch(cmd, nextCmd)
+	}
+	return m, cmd
+}
+
 func (m model) updateListView(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		s := msg.String()
+		if isListSearchShortcut(s) {
+			m.listAwaitTakeDigit = false
+			m.listSearchActive = true
+			m.listSearchTI.Focus()
+			m.listVP.Height = m.listViewportHeight()
+			return m, textinput.Blink
+		}
+		if m.listSearchActive {
+			return m.updateListSearchInput(msg)
+		}
 		switch s {
 		case "enter":
 			m.listAwaitTakeDigit = false
@@ -631,10 +743,7 @@ func (m model) updateInfo(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.infoReturnToList = false
 			m.info = ""
 			m.errLine = ""
-			m.step = StepListLoading
-			skip := m.listSkip
-			take := notes.NormalizeListTake(m.listTake)
-			return m, listCmd(m.svc, skip, take)
+			return m.startListLoad(m.listSkip, notes.NormalizeListTake(m.listTake), m.listSearchApplied, false)
 		}
 		m.menuCursor = 0
 		m.step = StepNotesMenu
@@ -678,8 +787,13 @@ func (m model) View() string {
 		v = notes.ScreenTitleStyle.Render("Notes") + "\n\n" + notes.LoadingStyle.Render("Loading notes…")
 	case StepListView:
 		banner := notes.ListViewPagingBanner(m.listItems, m.listTotal, m.listSkip, m.listTake)
-		v = notes.ScreenTitleStyle.Render("Notes") + "\n" + banner + "\n\n" + m.listVP.View() + "\n\n" +
-			navHint("1–9/0 open note on page · t+digit page size · spare digit page size · ←p →n [] · ↑↓jk scroll · Enter/Esc menu · Ctrl+Q: quit")
+		if m.showListSearchLine() {
+			v = notes.ScreenTitleStyle.Render("Notes") + "\n" + m.listSearchLine() + "\n" + banner + "\n\n" + m.listVP.View() + "\n\n" +
+				navHint("Cmd+F/Ctrl+F search · Enter apply search · 1–9/0 open · t+digit page size · ←p →n [] · ↑↓jk scroll · Esc close/back · Ctrl+Q quit")
+		} else {
+			v = notes.ScreenTitleStyle.Render("Notes") + "\n" + banner + "\n\n" + m.listVP.View() + "\n\n" +
+				navHint("Cmd+F/Ctrl+F search · 1–9/0 open · t+digit page size · ←p →n [] · ↑↓jk scroll · Enter/Esc menu · Ctrl+Q quit")
+		}
 	case StepNoteDetailLoading:
 		v = notes.ScreenTitleStyle.Render("Notes") + "\n\n" + notes.LoadingStyle.Render("Loading note…")
 	case StepNoteDetailView:

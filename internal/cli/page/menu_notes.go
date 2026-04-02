@@ -37,10 +37,7 @@ func (m model) activateNotesMenuSelection() (tea.Model, tea.Cmd) {
 	}
 	switch m.menuCursor {
 	case 0:
-		m.listSkip = 0
-		m.listTake = notes.NormalizeListTake(m.listTake)
-		m.step = StepListLoading
-		return m, listCmd(m.svc, m.listSkip, m.listTake)
+		return m.startListLoad(0, notes.NormalizeListTake(m.listTake), "", false)
 	case 1:
 		m.titleTI.SetValue("")
 		m.bodyTA.SetValue("")
