@@ -61,9 +61,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.listVP.Height = m.listViewportHeight()
 		}
 		if m.step == StepNoteDetailView && m.noteDetail != nil {
-			m.detailVP.SetContent(notes.FormatNoteDetail(m.noteDetail, m.width))
+			m.detailHeader = notes.FormatNoteDetailHeader(m.noteDetail, m.width)
+			m.detailVP.SetContent(notes.FormatNoteDetailBody(m.noteDetail, m.width))
 			m.detailVP.Width = m.width
-			m.detailVP.Height = notes.DetailScrollViewportHeight(m.height)
+			m.detailVP.Height = m.detailViewportHeight()
 		}
 		return m, nil
 
@@ -208,9 +209,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.noteDetail = msg.note
-		m.detailVP.SetContent(notes.FormatNoteDetail(m.noteDetail, m.width))
+		m.detailHeader = notes.FormatNoteDetailHeader(m.noteDetail, m.width)
+		m.detailVP.SetContent(notes.FormatNoteDetailBody(m.noteDetail, m.width))
 		m.detailVP.Width = m.width
-		m.detailVP.Height = notes.DetailScrollViewportHeight(m.height)
+		m.detailVP.Height = m.detailViewportHeight()
 		m.detailVP.GotoTop()
 		m.step = StepNoteDetailView
 		return m, nil
@@ -388,6 +390,18 @@ func shouldAutoSearch(term string) bool {
 
 func (m model) showListSearchLine() bool {
 	return m.listSearchActive || m.listSearchApplied != ""
+}
+
+func (m model) detailViewportHeight() int {
+	extra := 0
+	if m.detailHeader != "" {
+		extra = lipgloss.Height(m.detailHeader) + 1
+	}
+	h := m.height - notes.DetailViewFrameLines - extra - 2
+	if h < 4 {
+		h = 4
+	}
+	return h
 }
 
 func (m model) listViewportHeight() int {
@@ -797,7 +811,11 @@ func (m model) View() string {
 	case StepNoteDetailLoading:
 		v = notes.ScreenTitleStyle.Render("Notes") + "\n\n" + notes.LoadingStyle.Render("Loading note…")
 	case StepNoteDetailView:
-		s := notes.ScreenTitleStyle.Render("Note detail") + "\n\n" + m.detailVP.View()
+		header := notes.ScreenTitleStyle.Render("Note detail")
+		if m.detailHeader != "" {
+			header += "\n\n" + m.detailHeader
+		}
+		s := header + "\n\n" + notes.FormatViewportFrame(m.detailVP.View(), m.detailVP.ScrollPercent(), m.width)
 		hint := navHint("Esc: back to list · u: update · d: delete · ↑↓jk scroll · Ctrl+Q: quit")
 		v = pinFooterBelowContent(s, hint, m.height)
 		if m.detailDeleteConfirm {

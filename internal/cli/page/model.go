@@ -42,8 +42,9 @@ type model struct {
 
 	listAwaitTakeDigit bool
 
-	noteDetail *apimodel.NoteModel
-	detailVP   viewport.Model
+	noteDetail   *apimodel.NoteModel
+	detailHeader string
+	detailVP     viewport.Model
 
 	detailDeleteConfirm bool
 	detailDeleteLoading bool

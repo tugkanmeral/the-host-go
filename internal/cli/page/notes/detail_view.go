@@ -14,6 +14,9 @@ var (
 	detailMetaStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Faint(true)
 	detailBodyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#CDD6F4"))
 
+	vpBorderStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#585B70"))
+	vpScrollPctStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086"))
+
 	deleteConfirmBorderStyle = lipgloss.NewStyle().
 					Border(lipgloss.RoundedBorder()).
 					BorderForeground(lipgloss.Color("#F38BA8")).
@@ -30,7 +33,7 @@ func FormatDeleteConfirmDialog() string {
 	return deleteConfirmBorderStyle.Render(inner)
 }
 
-func FormatNoteDetail(note *apimodel.NoteModel, termWidth int) string {
+func FormatNoteDetailHeader(note *apimodel.NoteModel, termWidth int) string {
 	if note == nil {
 		return EmptyStyle.Render("(no note)")
 	}
@@ -46,20 +49,49 @@ func FormatNoteDetail(note *apimodel.NoteModel, termWidth int) string {
 	if !note.LastUpdateDate.IsZero() {
 		blocks = append(blocks, detailMetaStyle.Render(fmt.Sprintf("updated  %s", formatNoteTime(note.LastUpdateDate))))
 	}
-	blocks = append(blocks, "")
 
 	tagsLine := renderHighlightedTags(note.Tags)
 	if strings.TrimSpace(tagsLine) != "" {
-		blocks = append(blocks, tagsLine)
 		blocks = append(blocks, "")
-	}
-
-	body := strings.TrimRight(note.Text, "\n")
-	if body != "" {
-		blocks = append(blocks, detailBodyStyle.Width(innerW).Render(body))
+		blocks = append(blocks, tagsLine)
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, blocks...)
+}
+
+func FormatNoteDetailBody(note *apimodel.NoteModel, termWidth int) string {
+	if note == nil {
+		return ""
+	}
+	innerW := listInnerWidth(termWidth)
+	if innerW < 20 {
+		innerW = 20
+	}
+
+	body := strings.TrimRight(note.Text, "\n")
+	if body == "" {
+		return ""
+	}
+	return detailBodyStyle.Width(innerW).Render(body)
+}
+
+func FormatViewportFrame(vpContent string, scrollPercent float64, width int) string {
+	innerW := listInnerWidth(width)
+	if innerW < 20 {
+		innerW = 20
+	}
+
+	topLine := vpBorderStyle.Render(strings.Repeat("─", innerW))
+
+	pct := fmt.Sprintf(" %3.0f%% ", scrollPercent*100)
+	dashW := innerW - len(pct)
+	if dashW < 4 {
+		dashW = 4
+	}
+	bottomLine := vpBorderStyle.Render(strings.Repeat("─", dashW)) +
+		vpScrollPctStyle.Render(pct)
+
+	return topLine + "\n" + vpContent + "\n" + bottomLine
 }
 
 func formatNoteTime(t time.Time) string {
