@@ -18,7 +18,38 @@ type stringView string
 
 func (v stringView) View() string { return string(v) }
 
+func isTextSelectionStep(s Step) bool {
+	switch s {
+	case StepNoteDetailView, StepAddTitle, StepAddText, StepAddTags:
+		return true
+	default:
+		return false
+	}
+}
+
+func mouseToggleCmd(prev, next Step) tea.Cmd {
+	wasText := isTextSelectionStep(prev)
+	isText := isTextSelectionStep(next)
+	if isText && !wasText {
+		return func() tea.Msg { return tea.DisableMouse() }
+	}
+	if !isText && wasText {
+		return func() tea.Msg { return tea.EnableMouseCellMotion() }
+	}
+	return nil
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	prev := m.step
+	newModel, cmd := m.doUpdate(msg)
+	nm := newModel.(model)
+	if mc := mouseToggleCmd(prev, nm.step); mc != nil {
+		cmd = tea.Batch(cmd, mc)
+	}
+	return nm, cmd
+}
+
+func (m model) doUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
